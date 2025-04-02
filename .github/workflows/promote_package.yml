@@ -1,0 +1,55 @@
+name: Promote Python Package
+
+on:
+  repository_dispatch:
+    types: [package-synced]  # Assuming this is the webhook event type when sync completes
+
+env:
+  CLOUDSMITH_NAMESPACE: ${{ vars.CLOUDSMITH_NAMESPACE }}
+  CLOUDSMITH_STAGING_REPO: 'staging'
+  CLOUDSMITH_PRODUCTION_REPO: 'production'
+  CLOUDSMITH_SERVICE_SLUG: ${{ vars.CLOUDSMITH_SERVICE_SLUG }}
+  PACKAGE_NAME: 'example_package'
+
+permissions:
+  id-token: write
+
+jobs:
+  tag-and-promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Cloudsmith CLI
+        uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
+        with:
+          oidc-namespace: ${{ env.CLOUDSMITH_NAMESPACE }}
+          oidc-service-slug: ${{ env.CLOUDSMITH_SERVICE_SLUG }}
+
+      - name: Extract package info from webhook
+        id: package-info
+        run: |
+          # Assuming webhook payload contains package identifier and version
+          PACKAGE_ID=$(jq -r '.package.identifier_perm' <<< '${{ toJson(github.event.client_payload) }}')
+          PACKAGE_VERSION=$(jq -r '.package.version' <<< '${{ toJson(github.event.client_payload) }}')
+          
+          echo "Package ID: $PACKAGE_ID"
+          echo "Package Version: $PACKAGE_VERSION"
+          
+          # Set outputs for later steps
+          echo "package_id=$PACKAGE_ID" >> $GITHUB_OUTPUT
+          echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Tag package as ready-for-production
+        run: |
+          cloudsmith tag package \
+            ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/${{ steps.package-info.outputs.package_id }} \
+            --add ready-for-production
+        shell: bash
+
+      - name: Promote tagged package to production
+        run: |
+          # Now promote the package we just tagged
+          cloudsmith mv --yes \
+            ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/${{ steps.package-info.outputs.package_id }} \
+            ${{ env.CLOUDSMITH_PRODUCTION_REPO }}
+        shell: bash
