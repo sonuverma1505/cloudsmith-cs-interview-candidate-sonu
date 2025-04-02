@@ -37,29 +37,29 @@ jobs:
           echo "Token URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
           curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
           "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cloudsmith" | jq
-          - name: Get and Set OIDC Token
-          run: |
-            # Get JWT from GitHub OIDC provider
-            TOKEN_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cloudsmith")
-            
-            # Extract token value
-            OIDC_TOKEN=$(echo $TOKEN_RESPONSE | jq -r '.value')
-            
-            # Exchange for Cloudsmith token
-            CLOUDSMITH_TOKEN=$(curl -s -X POST \
-              -H "Content-Type: application/json" \
-              -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"$SERVICE_ACCOUNT_SLUG\"}" \
-              "https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/" | jq -r '.token')
-            
-            # Verify token works
-            curl -s -H "Authorization: Bearer $CLOUDSMITH_TOKEN" \
-              "https://api.cloudsmith.io/v1/user/self/" | jq
-            
-            # Set as environment variable
-            echo "CLOUDSMITH_API_KEY=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
-            echo "CLOUDSMITH_OIDC_TOKEN=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
-  
+      - name: Get and Set OIDC Token
+        run: |
+          # Get JWT from GitHub OIDC provider
+          TOKEN_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cloudsmith")
+          
+          # Extract token value
+          OIDC_TOKEN=$(echo $TOKEN_RESPONSE | jq -r '.value')
+          
+          # Exchange for Cloudsmith token
+          CLOUDSMITH_TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"$SERVICE_ACCOUNT_SLUG\"}" \
+            "https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/" | jq -r '.token')
+          
+          # Verify token works
+          curl -s -H "Authorization: Bearer $CLOUDSMITH_TOKEN" \
+            "https://api.cloudsmith.io/v1/user/self/" | jq
+          
+          # Set as environment variable
+          echo "CLOUDSMITH_API_KEY=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
+          echo "CLOUDSMITH_OIDC_TOKEN=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
+    
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
         with:
