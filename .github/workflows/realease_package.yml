@@ -32,14 +32,49 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-      - name: Get OIDC token
+
+      - name: Debug OIDC Token Request Variables
         run: |
-          value=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq '.value')
-          token=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/isv/ | jq -r '.token')
-          curl --request GET --url https://api.cloudsmith.io/v1/user/self/ --header "X-Api-Key:Bearer $token" --header 'accept: application/json'
-                    
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN} characters long"
+
+      - name: Fetch OIDC Token Manually
+        run: |
+          echo "Fetching OIDC token..."
+          response=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
+          echo "OIDC Token Response: $response"
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_URL }}
+
+      - name: Get OIDC token using GitHub Action
+        id: oidc
+        uses: actions/oidc-token@v1
+        with:
+          audience: api://AzureADTokenExchange
+
+      - name: Validate Cloudsmith Token Exchange
+        run: |
+          value="${{ steps.oidc.outputs.id_token }}"
+          echo "OIDC Token Length: ${#value} characters long"
+          
+          if [ -z "$value" ]; then
+            echo "Error: OIDC token is empty"
+            exit 1
+          fi
+
+          echo "Sending token to Cloudsmith..."
+          response=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":\"$value\", \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/isv/)
+          echo "Cloudsmith Response: $response"
+
+          token=$(echo "$response" | jq -r '.token')
+          if [ "$token" == "null" ] || [ -z "$token" ]; then
+            echo "Error: Failed to retrieve token from Cloudsmith"
+            exit 1
+          fi
+
           echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
-      
+
       - name: Push Python package to Cloudsmith
         uses: cloudsmith-io/action@v0.5.3
         with:
