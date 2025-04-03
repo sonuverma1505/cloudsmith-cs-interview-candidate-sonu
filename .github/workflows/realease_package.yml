@@ -32,7 +32,6 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-
       - name: Debug Repository Owner
         run: |
           echo "Repo Owner: $GITHUB_REPOSITORY_OWNER"
@@ -80,13 +79,9 @@ jobs:
           echo "OIDC Token Acquired."
       
           # Exchange OIDC token for Cloudsmith token
-          CLOUDSMITH_API_RESPONSE=$(curl -s -X POST "https://api.cloudsmith.io/openid/interview-sonu-verma/" \
+          CLOUDSMITH_TOKEN=$(curl -s -X POST "https://api.cloudsmith.io/openid/interview-sonu-verma/" \
             -H "Content-Type: application/json" \
-            -d "{\"oidc_token\": \"$OIDC_TOKEN\", \"service_slug\": \"test\"}")
-      
-          echo "Cloudsmith API Response: $CLOUDSMITH_API_RESPONSE"
-      
-          CLOUDSMITH_TOKEN=$(echo $CLOUDSMITH_API_RESPONSE | jq -r '.token')
+            -d "{\"oidc_token\": \"$OIDC_TOKEN\", \"service_slug\": \"test\"}" | jq -r '.token')
       
           if [ -z "$CLOUDSMITH_TOKEN" ] || [ "$CLOUDSMITH_TOKEN" == "null" ]; then
             echo "Failed to retrieve Cloudsmith OIDC token!"
@@ -103,7 +98,7 @@ jobs:
           # Set token as an environment variable
           echo "CLOUDSMITH_API_KEY=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
           echo "CLOUDSMITH_OIDC_TOKEN=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
-      
+        
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
         with:
