@@ -16,7 +16,7 @@ env:
 permissions:
   contents: read
   actions: read
-  id-token: write
+  id-token: write  # Required for OIDC
 
 jobs:
   publish:
@@ -32,77 +32,16 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-      - name: Debug Repository Owner
-        run: |
-          echo "Repo Owner: $GITHUB_REPOSITORY_OWNER"
-          echo "Repo Name: $GITHUB_REPOSITORY_NAME"
-          echo "Repo Full Name: $GITHUB_REPOSITORY"
 
-      - name: Set up Cloudsmith CLI
-        run: |
-          echo "CLOUDSMITH_NAMESPACE=${{ env.CLOUDSMITH_NAMESPACE }}" >> $GITHUB_ENV
-          echo "CLOUDSMITH_REPOSITORY=${{ env.CLOUDSMITH_REPOSITORY }}" >> $GITHUB_ENV
-          echo "CLOUDSMITH_SERVICE_SLUG=${{ env.CLOUDSMITH_SERVICE_SLUG }}" >> $GITHUB_ENV
+      - name: Get OIDC Token
+        id: oidc-token
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // Match audience from Cloudsmith configuration
+            const token = await core.getIDToken('https://token.actions.githubusercontent.com')
+            core.setOutput('token', token)
 
-      - name: Debug Environment Variables
-        run: |
-          echo "CLOUDSMITH_NAMESPACE=${{ env.CLOUDSMITH_NAMESPACE }}"
-          echo "CLOUDSMITH_REPOSITORY=${{ env.CLOUDSMITH_REPOSITORY }}"
-          echo "CLOUDSMITH_SERVICE_SLUG=${{ env.CLOUDSMITH_SERVICE_SLUG }}"
-
-      - name: Debug GitHub Context
-        run: |
-          echo "GITHUB_REPOSITORY=${{ github.repository }}"
-          echo "GITHUB_RUN_ID=${{ github.run_id }}"
-          echo "GITHUB_RUN_NUMBER=${{ github.run_number }}"
-          echo "GITHUB_SHA=${{ github.sha }}"
-          echo "GITHUB_REF=${{ github.ref }}"
-          echo "GITHUB_EVENT_NAME=${{ github.event_name }}"
-          echo "GITHUB_WORKFLOW=${{ github.workflow }}"
-
-      - name: Get OIDC Token and Authenticate with Cloudsmith
-        id: cloudsmith_oidc
-        run: |
-          echo "Requesting GitHub OIDC Token..."
-      
-          # Get GitHub OIDC token
-          OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
-      
-          echo "Raw OIDC_RESPONSE: $OIDC_RESPONSE"
-          OIDC_TOKEN=$(echo $OIDC_RESPONSE | jq -r '.value')
-      
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" == "null" ]; then
-            echo "Failed to retrieve GitHub OIDC token!"
-            exit 1
-          fi
-      
-          echo "OIDC Token Acquired: [REDACTED]"
-      
-          # Exchange OIDC token for Cloudsmith token
-          PAYLOAD=$(jq -n --arg oidc "$OIDC_TOKEN" --arg slug "${{ env.CLOUDSMITH_SERVICE_SLUG }}" '{oidc_token: $oidc, service_slug: $slug}')
-          echo "Cloudsmith Payload: $PAYLOAD"
-      
-          CLOUDSMITH_TOKEN=$(curl -s -X POST "https://api.cloudsmith.io/openid/interview-sonu-verma/" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" | jq -r '.token')
-      
-          if [ -z "$CLOUDSMITH_TOKEN" ] || [ "$CLOUDSMITH_TOKEN" == "null" ]; then
-            echo "Failed to retrieve Cloudsmith OIDC token!"
-            exit 1
-          fi
-      
-          echo "Cloudsmith OIDC Token Acquired: [REDACTED]"
-      
-          # Verify Cloudsmith authentication
-          curl -s --request GET --url "https://api.cloudsmith.io/v1/user/self/" \
-            --header "Authorization: Bearer $CLOUDSMITH_TOKEN" \
-            --header "Accept: application/json" | jq
-      
-          # Set token as an environment variable
-          echo "CLOUDSMITH_API_KEY=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
-          echo "CLOUDSMITH_OIDC_TOKEN=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
-        
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
         with:
@@ -114,10 +53,24 @@ jobs:
         shell: bash
 
       - name: Push package to Cloudsmith
+        env:
+          CLOUDSMITH_OIDC_TOKEN: ${{ steps.oidc-token.outputs.token }}
         run: |
           if ! ls dist/*.tar.gz 1> /dev/null 2>&1; then
             echo "No package found to upload"
             exit 1
           fi
-          cloudsmith push python ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} dist/*.tar.gz --republish
+          
+          # Using OIDC token for authentication
+          cloudsmith push python \
+            ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} \
+            dist/*.tar.gz \
+            --republish \
+            --oidc-token $CLOUDSMITH_OIDC_TOKEN
+          
+          # Alternative if CLI supports env var auto-detection:
+          # cloudsmith push python \
+          #   ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} \
+          #   dist/*.tar.gz \
+          #   --republish
         shell: bash
