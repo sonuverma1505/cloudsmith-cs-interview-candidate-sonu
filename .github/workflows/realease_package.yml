@@ -69,6 +69,7 @@ jobs:
           OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://token.actions.githubusercontent.com")
       
+          echo "OIDC_RESPONSE: $OIDC_RESPONSE"
           OIDC_TOKEN=$(echo $OIDC_RESPONSE | jq -r '.value')
       
           if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" == "null" ]; then
@@ -76,7 +77,7 @@ jobs:
             exit 1
           fi
       
-          echo "OIDC Token Acquired."
+          echo "OIDC Token Acquired: $OIDC_TOKEN"
       
           # Exchange OIDC token for Cloudsmith token
           CLOUDSMITH_TOKEN=$(curl -s -X POST "https://api.cloudsmith.io/openid/interview-sonu-verma/" \
@@ -88,7 +89,7 @@ jobs:
             exit 1
           fi
       
-          echo "Cloudsmith OIDC Token Acquired."
+          echo "Cloudsmith OIDC Token Acquired: $CLOUDSMITH_TOKEN"
       
           # Verify Cloudsmith authentication
           curl -s --request GET --url "https://api.cloudsmith.io/v1/user/self/" \
