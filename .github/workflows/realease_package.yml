@@ -60,28 +60,45 @@ jobs:
           echo "GITHUB_EVENT_NAME=${{ github.event_name }}"
           echo "GITHUB_WORKFLOW=${{ github.workflow }}"
 
-      - name: Get and Set OIDC Token
+      - name: Get OIDC Token and Authenticate with Cloudsmith
+        id: cloudsmith_oidc
         run: |
-          # Get JWT from GitHub OIDC provider
-          TOKEN_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=cloudsmith")
-          
-          # Extract token value
-          OIDC_TOKEN=$(echo $TOKEN_RESPONSE | jq -r '.value')
-          
-          # Exchange for Cloudsmith token
-          CLOUDSMITH_TOKEN=$(curl -s -X POST \
+          echo "Requesting GitHub OIDC Token..."
+      
+          # Get GitHub OIDC token
+          OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://token.actions.githubusercontent.com")
+      
+          OIDC_TOKEN=$(echo $OIDC_RESPONSE | jq -r '.value')
+      
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" == "null" ]; then
+            echo "Failed to retrieve GitHub OIDC token!"
+            exit 1
+          fi
+      
+          echo "OIDC Token Acquired."
+      
+          # Exchange OIDC token for Cloudsmith token
+          CLOUDSMITH_TOKEN=$(curl -s -X POST "https://api.cloudsmith.io/openid/interview-sonu-verma/" \
             -H "Content-Type: application/json" \
-            -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"$SERVICE_ACCOUNT_SLUG\"}" \
-            "https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/" | jq -r '.token')
-          
-          # Verify token works
-          curl -s -H "Authorization: Bearer $CLOUDSMITH_TOKEN" \
-            "https://api.cloudsmith.io/v1/user/self/" | jq
-          
-          # Set as environment variable
+            -d "{\"oidc_token\": \"$OIDC_TOKEN\", \"service_slug\": \"test\"}" | jq -r '.token')
+      
+          if [ -z "$CLOUDSMITH_TOKEN" ] || [ "$CLOUDSMITH_TOKEN" == "null" ]; then
+            echo "Failed to retrieve Cloudsmith OIDC token!"
+            exit 1
+          fi
+      
+          echo "Cloudsmith OIDC Token Acquired."
+      
+          # Verify Cloudsmith authentication
+          curl -s --request GET --url "https://api.cloudsmith.io/v1/user/self/" \
+            --header "Authorization: Bearer $CLOUDSMITH_TOKEN" \
+            --header "Accept: application/json" | jq
+      
+          # Set token as an environment variable
           echo "CLOUDSMITH_API_KEY=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
           echo "CLOUDSMITH_OIDC_TOKEN=$CLOUDSMITH_TOKEN" >> $GITHUB_ENV
+        
     
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
