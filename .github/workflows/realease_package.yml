@@ -16,7 +16,7 @@ env:
 permissions:
   contents: read
   actions: read
-  id-token: write  # Required for OIDC
+  id-token: write
 
 jobs:
   publish:
@@ -32,15 +32,13 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Get OIDC Token
-        id: oidc-token
-        uses: actions/github-script@v6
-        with:
-          script: |
-            // Match audience from Cloudsmith configuration
-            const token = await core.getIDToken('https://token.actions.githubusercontent.com')
-            core.setOutput('token', token)
+      
+      - run: echo "Testing out OpenID Connect in GitHub Actions."
+      - run: |
+          value=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq '.value')
+          echo "$value"
+          jwt=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/interview-sonu-verma/ | jq -r '.token' )
+          echo "OIDC token from Cloudsmith: $jwt"
 
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
@@ -53,24 +51,10 @@ jobs:
         shell: bash
 
       - name: Push package to Cloudsmith
-        env:
-          CLOUDSMITH_OIDC_TOKEN: ${{ steps.oidc-token.outputs.token }}
         run: |
           if ! ls dist/*.tar.gz 1> /dev/null 2>&1; then
             echo "No package found to upload"
             exit 1
           fi
-          
-          # Using OIDC token for authentication
-          cloudsmith push python \
-            ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} \
-            dist/*.tar.gz \
-            --republish \
-            --oidc-token $CLOUDSMITH_OIDC_TOKEN
-          
-          # Alternative if CLI supports env var auto-detection:
-          # cloudsmith push python \
-          #   ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} \
-          #   dist/*.tar.gz \
-          #   --republish
+          cloudsmith push python ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_REPOSITORY }} dist/*.tar.gz --republish
         shell: bash
