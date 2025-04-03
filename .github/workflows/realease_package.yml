@@ -34,13 +34,21 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
       - name: Get OIDC token
         run: |
-          curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange"
+          echo "Fetching OIDC token..."
+          OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
           
-          curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/isv/
+          echo "OIDC Response:"
+          echo "$OIDC_RESPONSE"
+      
+          # Extract token value
+          OIDC_TOKEN=$(echo "$OIDC_RESPONSE" | jq -r '.value')
           
-          # curl --request GET --url https://api.cloudsmith.io/v1/user/self/ --header "X-Api-Key:Bearer $token" --header 'accept: application/json'
-                    
-          # echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
+          echo "Using OIDC token for Cloudsmith API..."
+          CLOUDSMITH_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/isv/)
+          
+          echo "Cloudsmith API Response:"
+          echo "$CLOUDSMITH_RESPONSE"
+        
       
       - name: Push Python package to Cloudsmith
         uses: cloudsmith-io/action@v0.5.3
