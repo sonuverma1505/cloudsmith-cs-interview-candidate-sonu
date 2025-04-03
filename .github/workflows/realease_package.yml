@@ -32,6 +32,34 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Debug Repository Owner
+        run: |
+          echo "Repo Owner: $GITHUB_REPOSITORY_OWNER"
+          echo "Repo Name: $GITHUB_REPOSITORY_NAME"
+          echo "Repo Full Name: $GITHUB_REPOSITORY"
+
+      - name: Set up Cloudsmith CLI
+        run: |
+          echo "CLOUDSMITH_NAMESPACE=${{ env.CLOUDSMITH_NAMESPACE }}" >> $GITHUB_ENV
+          echo "CLOUDSMITH_REPOSITORY=${{ env.CLOUDSMITH_REPOSITORY }}" >> $GITHUB_ENV
+          echo "CLOUDSMITH_SERVICE_SLUG=${{ env.CLOUDSMITH_SERVICE_SLUG }}" >> $GITHUB_ENV
+
+      - name: Debug Environment Variables
+        run: |
+          echo "CLOUDSMITH_NAMESPACE=${{ env.CLOUDSMITH_NAMESPACE }}"
+          echo "CLOUDSMITH_REPOSITORY=${{ env.CLOUDSMITH_REPOSITORY }}"
+          echo "CLOUDSMITH_SERVICE_SLUG=${{ env.CLOUDSMITH_SERVICE_SLUG }}"
+
+      - name: Debug GitHub Context
+        run: |
+          echo "GITHUB_REPOSITORY=${{ github.repository }}"
+          echo "GITHUB_RUN_ID=${{ github.run_id }}"
+          echo "GITHUB_RUN_NUMBER=${{ github.run_number }}"
+          echo "GITHUB_SHA=${{ github.sha }}"
+          echo "GITHUB_REF=${{ github.ref }}"
+          echo "GITHUB_EVENT_NAME=${{ github.event_name }}"
+          echo "GITHUB_WORKFLOW=${{ github.workflow }}"
+
       - name: Get and Set OIDC Token
         run: |
           # Get JWT from GitHub OIDC provider
