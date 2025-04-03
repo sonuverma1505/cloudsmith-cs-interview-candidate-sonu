@@ -33,18 +33,13 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
       
-      - run: echo "Testing out OpenID Connect in GitHub Actions."
-      - run: |
+      - name: Get OIDC token
+        run: |
           value=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq '.value')
-          echo "$value"
-          jwt=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\"test\"}" https://api.cloudsmith.io/openid/interview-sonu-verma/ | jq -r '.token' )
-          echo "OIDC token from Cloudsmith: $jwt"
-
-      - name: Install Cloudsmith CLI
-        uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
-        with:
-          oidc-namespace: ${{ env.CLOUDSMITH_NAMESPACE }}
-          oidc-service-slug: ${{ env.CLOUDSMITH_SERVICE_SLUG }}
+          token=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\"$CLOUDSMITH_SERVICE_SLUG\"}" https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/ | jq -r '.token')
+          curl --request GET --url https://api.cloudsmith.io/v1/user/self/ --header "X-Api-Key:Bearer $token" --header 'accept: application/json'
+                    
+          echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
 
       - name: List directory contents
         run: ls -la dist/
