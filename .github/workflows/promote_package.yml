@@ -2,7 +2,7 @@ name: Promote Python Package
 
 on:
   repository_dispatch:
-    types: [package-synced]  # Assuming this is the webhook event type when sync completes
+    types: [package.synced]  # Assuming this is the webhook event type when sync completes
 
 env:
   CLOUDSMITH_NAMESPACE: ${{ vars.CLOUDSMITH_NAMESPACE }}
@@ -10,6 +10,8 @@ env:
   CLOUDSMITH_PRODUCTION_REPO: 'production'
   CLOUDSMITH_SERVICE_SLUG: ${{ vars.CLOUDSMITH_SERVICE_SLUG }}
   PACKAGE_NAME: 'example_package'
+  CLOUDSMITH_HMAC_KEY: ${{ secrets.CLOUDSMITH_HMAC_KEY }}
+
 
 permissions:
   id-token: write
