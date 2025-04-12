@@ -41,22 +41,20 @@ jobs:
             ready-for-production
         shell: bash
 
-      - name: Promote packages tagged ready-for-production
+      - name: Promote package if tagged 'ready-for-production'
         run: |
-          echo "Looking for packages tagged 'ready-for-production' in staging..."
-          
-          PACKAGE_DATA=$(cloudsmith list package ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }} -F json --tag "ready-for-production")
-          COUNT=$(echo "$PACKAGE_DATA" | jq '.data | length')
+          IDENTIFIER="${{ steps.extract.outputs.identifier }}"
+          echo "Checking tags for package: $IDENTIFIER"
 
-          if [ "$COUNT" -eq 0 ]; then
-            echo "No packages found with the 'ready-for-production' tag."
-            exit 0
-          fi
+          TAGS=$(cloudsmith tags list ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER -F json)
+          HAS_TAG=$(echo "$TAGS" | jq -r '.data[]?.slug' | grep -x "ready-for-production" || true)
 
-          for IDENTIFIER in $(echo "$PACKAGE_DATA" | jq -r '.data[].identifier_perm'); do
+          if [ -n "$HAS_TAG" ]; then
             echo "Promoting package: $IDENTIFIER"
             cloudsmith move \
               ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER \
               ${{ env.CLOUDSMITH_PRODUCTION_REPO }}
-          done
+          else
+            echo "Package $IDENTIFIER does not have 'ready-for-production' tag. Skipping promotion."
+          fi
         shell: bash
