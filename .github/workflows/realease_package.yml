@@ -62,7 +62,7 @@ jobs:
         with:
             command: 'push'
             format: 'python'
-            owner: ${{ env.CLOUDSMITH_NAMESPACE }}
-            repo: ${{ env.CLOUDSMITH_REPOSITORY }}
+            owner: 'interview-sonu-verma-vJXw'
+            repo: 'staging'
             file: 'dist/*.tar.gz'
             republish: 'true'
