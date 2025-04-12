@@ -44,10 +44,11 @@ jobs:
           OIDC_TOKEN=$(echo "$OIDC_RESPONSE" | jq -r '.value')
           
           echo "Using OIDC token for Cloudsmith API..."
-          CLOUDSMITH_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"$CLOUDSMITH_SERVICE_SLUG\"}" https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/)
-          
+          token=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":\"$OIDC_TOKEN\", \"service_slug\":\"$CLOUDSMITH_SERVICE_SLUG\"}" https://api.cloudsmith.io/openid/$CLOUDSMITH_NAMESPACE/)
+          echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
           echo "Cloudsmith API Response:"
-          echo "$CLOUDSMITH_RESPONSE"
+          echo "$CLOUDSMITH_API_KEY"
+          curl --request GET --url https://api.cloudsmith.io/v1/user/self/ --header "X-Api-Key:Bearer $token" --header 'accept: application/json'
         
       
       - name: Push Python package to Cloudsmith
@@ -59,4 +60,3 @@ jobs:
           repo: ${{ env.CLOUDSMITH_REPOSITORY }}
           file: 'dist/*.tar.gz'
           republish: 'true'
-          api-key: ${{ env.CLOUDSMITH_API_KEY }}  # Use retrieved OIDC token
