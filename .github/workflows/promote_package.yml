@@ -49,8 +49,9 @@ jobs:
           # Get raw tag output and validate JSON
           TAGS_JSON=$(cloudsmith tags list ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER -F json 2>/dev/null)
 
-          if echo "$TAGS_JSON" | jq -e '.data' > /dev/null; then
-            HAS_TAG=$(echo "$TAGS_JSON" | jq -r '.data[]?.slug' | grep -x "ready-for-production" || true)
+          # Validate JSON format and extract all tags
+          if echo "$TAGS_JSON" | jq -e '.data.tags' > /dev/null; then
+            HAS_TAG=$(echo "$TAGS_JSON" | jq -r '.data.tags | to_entries[] | .value[]' | grep -x "ready-for-production" || true)
 
             if [ -n "$HAS_TAG" ]; then
               echo "✅ Tag found. Promoting package: $IDENTIFIER"
@@ -66,4 +67,3 @@ jobs:
             exit 1
           fi
         shell: bash
-
