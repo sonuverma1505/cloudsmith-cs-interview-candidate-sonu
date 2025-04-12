@@ -35,8 +35,9 @@ jobs:
       - name: Get OIDC token
         run: |
           echo "Fetching OIDC token..."
-          OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
-          
+          # OIDC_RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
+          OIDC_RESPONSE=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://github.com/sonuverma1505/cloudsmith-cs-interview-candidate-sonu" | jq -r '.value')
+
           echo "OIDC Response:"
           echo "$OIDC_RESPONSE"
       
