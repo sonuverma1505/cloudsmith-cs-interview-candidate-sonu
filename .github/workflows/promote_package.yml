@@ -36,7 +36,7 @@ jobs:
         run: |
           IDENTIFIER="${{ steps.extract.outputs.identifier }}"
           echo "Tagging package $IDENTIFIER with 'ready-for-production'"
-          cloudsmith tags add --yes \
+          cloudsmith tags add \
             ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER \
             ready-for-production
         shell: bash
@@ -55,7 +55,7 @@ jobs:
 
           for IDENTIFIER in $(echo "$PACKAGE_DATA" | jq -r '.data[].identifier_perm'); do
             echo "Promoting package: $IDENTIFIER"
-            cloudsmith mv --yes \
+            cloudsmith move \
               ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER \
               ${{ env.CLOUDSMITH_PRODUCTION_REPO }}
           done
