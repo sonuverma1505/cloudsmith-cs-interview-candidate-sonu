@@ -46,15 +46,24 @@ jobs:
           IDENTIFIER="${{ steps.extract.outputs.identifier }}"
           echo "Checking tags for package: $IDENTIFIER"
 
-          TAGS=$(cloudsmith tags list ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER -F json)
-          HAS_TAG=$(echo "$TAGS" | jq -r '.data[]?.slug' | grep -x "ready-for-production" || true)
+          # Get raw tag output and validate JSON
+          TAGS_JSON=$(cloudsmith tags list ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER -F json 2>/dev/null)
 
-          if [ -n "$HAS_TAG" ]; then
-            echo "Promoting package: $IDENTIFIER"
-            cloudsmith move \
-              ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER \
-              ${{ env.CLOUDSMITH_PRODUCTION_REPO }}
+          if echo "$TAGS_JSON" | jq -e '.data' > /dev/null; then
+            HAS_TAG=$(echo "$TAGS_JSON" | jq -r '.data[]?.slug' | grep -x "ready-for-production" || true)
+
+            if [ -n "$HAS_TAG" ]; then
+              echo "✅ Tag found. Promoting package: $IDENTIFIER"
+              cloudsmith move \
+                ${{ env.CLOUDSMITH_NAMESPACE }}/${{ env.CLOUDSMITH_STAGING_REPO }}/$IDENTIFIER \
+                ${{ env.CLOUDSMITH_PRODUCTION_REPO }}
+            else
+              echo "⚠️ Tag 'ready-for-production' not found for $IDENTIFIER. Skipping promotion."
+            fi
           else
-            echo "Package $IDENTIFIER does not have 'ready-for-production' tag. Skipping promotion."
+            echo "❌ Failed to parse tag list JSON. Skipping promotion."
+            echo "$TAGS_JSON"
+            exit 1
           fi
         shell: bash
+
