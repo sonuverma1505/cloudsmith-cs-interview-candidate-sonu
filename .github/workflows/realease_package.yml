@@ -32,16 +32,31 @@ jobs:
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-      - name: Get OIDC token
-        run: |
-          echo "Fetching OIDC token..."
-          value=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
-          echo "Using OIDC token for Cloudsmith API..."
-          token=$(curl -X POST -H "Content-Type: application/json" -d "{\"oidc_token\":$value, \"service_slug\":\test-git\"}" https://api.cloudsmith.io/openid/interview-sonu-verma-vJXw/ | jq -r '.token')
-          curl --request GET --url https://api.cloudsmith.io/v1/user/self/ --header "X-Api-Key:Bearer $token" --header 'accept: application/json'
+          - name: Get OIDC token
+          run: |
+            echo "Fetching OIDC token..."
+            
+            # Step 1: Get the OIDC token from GitHub with custom audience
+            value=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+            
+            echo "Using OIDC token to authenticate with Cloudsmith..."
         
-          echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
-      - name: Push Python package to Cloudsmith
+            # Step 2: Send OIDC token to Cloudsmith to get a short-lived API token
+            token=$(curl -s -X POST https://api.cloudsmith.io/openid/interview-sonu-verma-vJXw/ \
+              -H "Content-Type: application/json" \
+              -d "{\"oidc_token\":\"$value\", \"service_slug\":\"test-git\"}" \
+              | jq -r '.token')
+        
+            # Step 3: Optional - verify token works (get info on authenticated user)
+            curl --request GET \
+              --url https://api.cloudsmith.io/v1/user/self/ \
+              --header "Authorization: Bearer $token" \
+              --header "Accept: application/json"
+        
+            # Step 4: Export for later steps
+            echo "CLOUDSMITH_API_KEY=$token" >> $GITHUB_ENV
+        
         uses: cloudsmith-io/action@v0.5.3
         with:
           command: 'push'
