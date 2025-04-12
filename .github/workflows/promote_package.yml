@@ -12,12 +12,14 @@ env:
   CLOUDSMITH_STAGING_REPO: 'staging'
   CLOUDSMITH_PRODUCTION_REPO: 'production'
   CLOUDSMITH_SERVICE_SLUG: ${{ vars.CLOUDSMITH_SERVICE_SLUG }}
+  EVENT_CONTEXT: ${{ toJSON(github.event) }}
 
 jobs:
   promote:
     runs-on: ubuntu-latest
 
     steps:
+      
       - name: Install Cloudsmith CLI
         uses: cloudsmith-io/cloudsmith-cli-action@v1.0.1
         with:
@@ -27,6 +29,7 @@ jobs:
       - name: Extract Package Identifier from Webhook Payload
         id: extract
         run: |
+          echo "Event-context: $EVENT_CONTEXT"
           echo "Payload: ${{ toJson(github.event.client_payload) }}"
           IDENTIFIER=$(echo '${{ toJson(github.event.client_payload.data.identifier_perm) }}' | tr -d '"')
           echo "identifier=$IDENTIFIER" >> $GITHUB_OUTPUT
